@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, ChevronDown, Crown, Check, Bell, Loader2, Plus } from 'lucide-react';
+import { Users, ChevronDown, Crown, Check, Bell, Loader2, Settings } from 'lucide-react';
 import { useActiveGroup } from '@/contexts/ActiveGroupContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -120,7 +120,7 @@ export const GroupSwitcher = () => {
           onClick={() => navigate('/gruppi')}
           className="cursor-pointer"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Settings className="h-4 w-4 mr-2" />
           Gestisci gruppi
         </DropdownMenuItem>
       </DropdownMenuContent>
