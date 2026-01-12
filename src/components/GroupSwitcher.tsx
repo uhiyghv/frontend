@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Users, ChevronDown, Crown, Check, Bell, Loader2, Settings } from 'lucide-react';
+import { Users, ChevronDown, Crown, Check, Bell, Loader2, Settings, User } from 'lucide-react';
 import { useActiveGroup } from '@/contexts/ActiveGroupContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -69,8 +69,10 @@ export const GroupSwitcher = () => {
             className="flex items-center justify-between cursor-pointer"
           >
             <div className="flex items-center gap-2">
-              {group.owner_id === user?.id && (
+              {group.owner_id === user?.id ? (
                 <Crown className="h-3 w-3 text-primary" />
+              ) : (
+                <User className="h-3 w-3 text-primary" />
               )}
               <span className="truncate">{group.name}</span>
             </div>
