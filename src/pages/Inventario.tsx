@@ -43,6 +43,10 @@ interface Product {
   created_at: string;
   image_url?: string | null;
   brand?: string | null;
+  origin?: string | null;
+  nutriscore?: string | null;
+  ecoscore?: string | null;
+  nova_group?: number | null;
 }
 
 interface ProductWithDetails extends Product {
@@ -51,6 +55,7 @@ interface ProductWithDetails extends Product {
   dispensaProducts: { id: string; dispensa_id: string; quantity: number; expiry_date: string | null }[];
   allCategories: string[];
   nearestExpiry: string | null;
+  displayQuantity: number; // 1 if not in any pantry, otherwise totalQuantity
 }
 
 interface Dispensa {
@@ -58,7 +63,7 @@ interface Dispensa {
   name: string;
 }
 
-type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "actions";
+type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "origin" | "nutriscore" | "ecoscore" | "nova" | "actions";
 
 const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "select", label: "Seleziona" },
@@ -70,6 +75,10 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
   { key: "dispensa", label: "Dispensa" },
   { key: "quantity", label: "Quantità" },
   { key: "expiry", label: "Scadenza" },
+  { key: "origin", label: "Origine" },
+  { key: "nutriscore", label: "Nutri-Score" },
+  { key: "ecoscore", label: "Eco-Score" },
+  { key: "nova", label: "NOVA" },
   { key: "date", label: "Data creazione" },
   { key: "actions", label: "Azioni" },
 ];
@@ -177,14 +186,19 @@ const Inventario = () => {
         productCategoriesMap[cat.product_id].push(cat.category_name);
       });
 
-      const productsWithDetails: ProductWithDetails[] = allProducts.map((p) => ({
-        ...p,
-        totalQuantity: productDispenseMap[p.id]?.total || 0,
-        dispensaNames: productDispenseMap[p.id]?.names || [],
-        dispensaProducts: productDispenseMap[p.id]?.products || [],
-        allCategories: productCategoriesMap[p.id] || (p.category ? [p.category] : []),
-        nearestExpiry: productDispenseMap[p.id]?.nearestExpiry || null,
-      }));
+      const productsWithDetails: ProductWithDetails[] = allProducts.map((p) => {
+        const totalQty = productDispenseMap[p.id]?.total || 0;
+        const hasDispensa = (productDispenseMap[p.id]?.products?.length || 0) > 0;
+        return {
+          ...p,
+          totalQuantity: totalQty,
+          dispensaNames: productDispenseMap[p.id]?.names || [],
+          dispensaProducts: productDispenseMap[p.id]?.products || [],
+          allCategories: productCategoriesMap[p.id] || (p.category ? [p.category] : []),
+          nearestExpiry: productDispenseMap[p.id]?.nearestExpiry || null,
+          displayQuantity: hasDispensa ? totalQty : 1, // Show 1 if not in any pantry
+        };
+      });
 
       setProducts(productsWithDetails);
       setDispense(dispenseData || []);
@@ -366,6 +380,28 @@ const Inventario = () => {
       return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />{format(expiry, "dd MMM", { locale: it })}</Badge>;
     }
     return <Badge variant="outline" className="text-xs">{format(expiry, "dd MMM yyyy", { locale: it })}</Badge>;
+  };
+
+  const getNutriscoreBg = (score: string) => {
+    switch (score.toLowerCase()) {
+      case 'a': return 'bg-green-600';
+      case 'b': return 'bg-lime-500';
+      case 'c': return 'bg-yellow-500';
+      case 'd': return 'bg-orange-500';
+      case 'e': return 'bg-red-600';
+      default: return 'bg-muted';
+    }
+  };
+
+  const getEcoscoreBg = (score: string) => {
+    switch (score.toLowerCase()) {
+      case 'a': return 'bg-green-600';
+      case 'b': return 'bg-lime-500';
+      case 'c': return 'bg-yellow-500';
+      case 'd': return 'bg-orange-500';
+      case 'e': return 'bg-red-600';
+      default: return 'bg-muted';
+    }
   };
 
   const toggleProductSelection = (productId: string) => {
@@ -567,6 +603,10 @@ const Inventario = () => {
                     {isColumnVisible("dispensa") && <TableHead>Dispensa</TableHead>}
                     {isColumnVisible("quantity") && <TableHead>Quantità</TableHead>}
                     {isColumnVisible("expiry") && <TableHead>Scadenza</TableHead>}
+                    {isColumnVisible("origin") && <TableHead>Origine</TableHead>}
+                    {isColumnVisible("nutriscore") && <TableHead>Nutri-Score</TableHead>}
+                    {isColumnVisible("ecoscore") && <TableHead>Eco-Score</TableHead>}
+                    {isColumnVisible("nova") && <TableHead>NOVA</TableHead>}
                     {isColumnVisible("date") && <TableHead>Data creazione</TableHead>}
                     {isColumnVisible("actions") && <TableHead className="text-right">Azioni</TableHead>}
                   </TableRow>
@@ -591,20 +631,28 @@ const Inventario = () => {
                       ) : <span className="text-muted-foreground">—</span>}</TableCell>}
                       {isColumnVisible("quantity") && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, -1, e)} disabled={product.totalQuantity === 0}>
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <Badge variant={product.totalQuantity === 0 ? "outline" : "secondary"} className="min-w-[40px] justify-center">
-                              {product.totalQuantity > 0 ? `${product.totalQuantity}` : "0"}
-                            </Badge>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, 1, e)}>
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
+                          {product.dispensaProducts.length > 0 ? (
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, -1, e)} disabled={product.totalQuantity === 0}>
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <Badge variant={product.totalQuantity === 0 ? "outline" : "secondary"} className="min-w-[40px] justify-center">
+                                {product.totalQuantity}
+                              </Badge>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, 1, e)}>
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Badge variant="secondary" className="min-w-[40px] justify-center">1</Badge>
+                          )}
                         </TableCell>
                       )}
                       {isColumnVisible("expiry") && <TableCell>{getExpiryBadge(product.nearestExpiry)}</TableCell>}
+                      {isColumnVisible("origin") && <TableCell className="text-muted-foreground text-sm">{product.origin || "—"}</TableCell>}
+                      {isColumnVisible("nutriscore") && <TableCell>{product.nutriscore ? <Badge className={cn("uppercase font-bold text-white", getNutriscoreBg(product.nutriscore))}>{product.nutriscore}</Badge> : "—"}</TableCell>}
+                      {isColumnVisible("ecoscore") && <TableCell>{product.ecoscore ? <Badge className={cn("uppercase font-bold text-white", getEcoscoreBg(product.ecoscore))}>{product.ecoscore}</Badge> : "—"}</TableCell>}
+                      {isColumnVisible("nova") && <TableCell>{product.nova_group ? <Badge variant="outline" className="font-bold">{product.nova_group}</Badge> : "—"}</TableCell>}
                       {isColumnVisible("date") && <TableCell className="text-muted-foreground">{new Date(product.created_at).toLocaleDateString('it-IT')}</TableCell>}
                       {isColumnVisible("actions") && <TableCell className="text-right">
                         <div className="flex justify-end gap-1">

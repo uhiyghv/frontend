@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/backend/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveGroup } from "@/contexts/ActiveGroupContext";
 import { format, subDays, startOfDay, endOfDay, eachDayOfInterval } from "date-fns";
 import { it } from "date-fns/locale";
 
@@ -82,6 +83,7 @@ const generateColor = (index: number, total: number) => {
 
 const Grafici = () => {
   const { user } = useAuth();
+  const { activeGroup } = useActiveGroup();
   const [isLoading, setIsLoading] = useState(true);
   const [scanLogs, setScanLogs] = useState<ScanLog[]>([]);
   const [categories, setCategories] = useState<CategoryCount[]>([]);
@@ -94,11 +96,11 @@ const Grafici = () => {
   const [allDispense, setAllDispense] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
-    if (user) fetchData();
-  }, [user, dateRange]);
+    if (user && activeGroup) fetchData();
+  }, [user, activeGroup, dateRange]);
 
   const fetchData = async () => {
-    if (!user) return;
+    if (!user || !activeGroup) return;
     setIsLoading(true);
 
     try {
@@ -114,10 +116,11 @@ const Grafici = () => {
 
       setScanLogs(logsData || []);
 
-      // Fetch products with categories
+      // Fetch products with categories for this group
       const { data: productsData } = await supabase
         .from("products")
-        .select("id, category");
+        .select("id, category")
+        .eq("group_id", activeGroup.id);
 
       // Fetch product categories
       const { data: productCategoriesData } = await supabase
@@ -148,10 +151,11 @@ const Grafici = () => {
       );
       setAllCategories(Array.from(uniqueCategories).sort());
 
-      // Fetch dispense with stock
+      // Fetch dispense with stock for this group
       const { data: dispenseData } = await supabase
         .from("dispense")
-        .select("id, name, color");
+        .select("id, name, color")
+        .eq("group_id", activeGroup.id);
 
       setAllDispense(dispenseData?.map((d) => ({ id: d.id, name: d.name })) || []);
 
