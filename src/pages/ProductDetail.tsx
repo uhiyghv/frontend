@@ -737,7 +737,7 @@ const ProductDetail = () => {
               <img
                 src={flagUrl}
                 alt={product.origin || "Origin flag"}
-                className="h-6 w-auto shadow-sm rounded-sm object-cover"
+                className="h-6 w-auto shadow-sm rounded-sm object-cover aspect-[3/2]"
                 title={product.origin || ""}
               />
             ) : product.origin ? (
