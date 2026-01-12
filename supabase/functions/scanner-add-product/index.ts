@@ -205,7 +205,8 @@ Deno.serve(async (req) => {
     }
 
     // 6. Final Logs (Con Await)
-    const locationName = Array.isArray(scanner.dispense) ? scanner.dispense[0]?.name : scanner.dispense?.name || "dispensa";
+    const dispenseData = scanner.dispense as { name: string } | { name: string }[] | null;
+    const locationName = Array.isArray(dispenseData) ? dispenseData[0]?.name : dispenseData?.name || "dispensa";
     
     await Promise.all([
       serviceSupabase.from('scan_logs').insert({

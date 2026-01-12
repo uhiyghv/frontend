@@ -53,7 +53,7 @@ interface GroupInvite {
 
 const Groups = () => {
   const { user } = useAuth();
-  const { groups, activeGroup, refreshGroups } = useActiveGroup();
+  const { groups, activeGroup, refreshGroups, pendingInvites, acceptInvite, declineInvite, refreshInvites } = useActiveGroup();
   const { addLocalNotification } = useNotificationContext();
   
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -61,6 +61,7 @@ const Groups = () => {
   const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [acceptingInvite, setAcceptingInvite] = useState<string | null>(null);
 
   // Dialogs
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -294,6 +295,27 @@ const Groups = () => {
     }
   };
 
+  const handleAcceptInvite = async (inviteId: string) => {
+    setAcceptingInvite(inviteId);
+    const success = await acceptInvite(inviteId);
+    if (success) {
+      toast.success("Invito accettato! Sei ora membro del gruppo.");
+      addLocalNotification("Invito accettato", "Sei stato aggiunto al gruppo", "success");
+    } else {
+      toast.error("Errore nell'accettare l'invito");
+    }
+    setAcceptingInvite(null);
+  };
+
+  const handleDeclineInvite = async (inviteId: string) => {
+    const success = await declineInvite(inviteId);
+    if (success) {
+      toast.success("Invito rifiutato");
+    } else {
+      toast.error("Errore nel rifiutare l'invito");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -364,7 +386,67 @@ const Groups = () => {
         </Dialog>
       </div>
 
-      {groups.length === 0 ? (
+      {/* Pending Invites Received */}
+      {pendingInvites.length > 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Mail className="h-5 w-5 text-primary" />
+              Inviti ricevuti ({pendingInvites.length})
+            </CardTitle>
+            <CardDescription>Hai ricevuto inviti per unirti a questi gruppi</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingInvites.map((invite) => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between p-4 rounded-lg bg-background border"
+              >
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/20 text-primary">
+                      <Users className="h-5 w-5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{invite.group_name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Invitato da {invite.invited_by_username || "un utente"} come {invite.role}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(invite.created_at).toLocaleDateString("it-IT")}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {getRoleBadge(invite.role)}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive"
+                    onClick={() => handleDeclineInvite(invite.id)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAcceptInvite(invite.id)}
+                    disabled={acceptingInvite === invite.id}
+                  >
+                    {acceptingInvite === invite.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <><Check className="h-4 w-4 mr-1" />Accetta</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {groups.length === 0 && pendingInvites.length === 0 ? (
         <Card className="py-12">
           <CardContent className="text-center">
             <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -378,7 +460,7 @@ const Groups = () => {
             </Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : groups.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Groups List */}
           <Card className="lg:col-span-1">

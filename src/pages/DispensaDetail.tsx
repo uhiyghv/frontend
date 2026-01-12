@@ -38,6 +38,7 @@ import { supabase } from "@/integrations/backend/client";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { useNotificationContext } from "@/contexts/NotificationContext";
+import { useActiveGroup } from "@/contexts/ActiveGroupContext";
 
 interface Dispensa {
   id: string;
@@ -46,6 +47,7 @@ interface Dispensa {
   color: string | null;
   products_count: number | null;
   created_at: string;
+  group_id: string | null;
 }
 
 interface Scanner {
@@ -84,6 +86,7 @@ const DispensaDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addLocalNotification } = useNotificationContext();
+  const { activeGroup } = useActiveGroup();
   const [dispensa, setDispensa] = useState<Dispensa | null>(null);
   const [scanners, setScanners] = useState<Scanner[]>([]);
   const [products, setProducts] = useState<ProductInDispensa[]>([]);

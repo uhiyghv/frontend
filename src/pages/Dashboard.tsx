@@ -204,19 +204,28 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Panoramica di <span className="text-primary font-medium">{activeGroup?.name}</span>
-          </p>
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-background p-6 border border-primary/20">
+        <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Panoramica di <span className="text-primary font-semibold">{activeGroup?.name}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {groups.length > 1 && (
+              <Badge variant="outline" className="gap-1 bg-background/80 backdrop-blur-sm">
+                <Users className="h-3 w-3" />
+                {groups.length} gruppi
+              </Badge>
+            )}
+            <div className="h-14 w-14 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+              <Warehouse className="h-7 w-7 text-primary-foreground" />
+            </div>
+          </div>
         </div>
-        {groups.length > 1 && (
-          <Badge variant="outline" className="gap-1">
-            <Users className="h-3 w-3" />
-            {groups.length} gruppi
-          </Badge>
-        )}
       </div>
 
       {/* Stats Grid */}
@@ -224,17 +233,19 @@ const Dashboard = () => {
         {statsCards.map((stat) => (
           <Card
             key={stat.title}
-            className="hover:shadow-lg transition-all cursor-pointer group"
+            className="hover:shadow-lg hover:border-primary/30 transition-all cursor-pointer group overflow-hidden"
             onClick={() => navigate(stat.link)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <stat.icon className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <stat.icon className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold mb-1">{stat.value}</div>
+              <div className="text-3xl font-bold mb-2">{stat.value}</div>
               <Badge variant={stat.variant} className="text-xs">
                 {stat.description}
               </Badge>
@@ -245,14 +256,17 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Quick Actions */}
-        <Card>
+        <Card className="bg-gradient-to-br from-card to-muted/30">
           <CardHeader>
-            <CardTitle>Azioni Rapide</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Azioni Rapide
+            </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
             <Button
               variant="outline"
-              className="h-auto py-4 flex flex-col gap-2 group"
+              className="h-auto py-4 flex flex-col gap-2 group hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
               onClick={() => navigate("/dispense")}
             >
               <Warehouse className="h-6 w-6 text-primary group-hover:text-primary-foreground transition-colors" />
@@ -260,7 +274,7 @@ const Dashboard = () => {
             </Button>
             <Button
               variant="outline"
-              className="h-auto py-4 flex flex-col gap-2 group"
+              className="h-auto py-4 flex flex-col gap-2 group hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
               onClick={() => navigate("/dispositivi")}
             >
               <Cpu className="h-6 w-6 text-primary group-hover:text-primary-foreground transition-colors" />
@@ -268,7 +282,7 @@ const Dashboard = () => {
             </Button>
             <Button
               variant="outline"
-              className="h-auto py-4 flex flex-col gap-2 group"
+              className="h-auto py-4 flex flex-col gap-2 group hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
               onClick={() => navigate("/inventario")}
             >
               <Package className="h-6 w-6 text-primary group-hover:text-primary-foreground transition-colors" />
@@ -276,7 +290,7 @@ const Dashboard = () => {
             </Button>
             <Button
               variant="outline"
-              className="h-auto py-4 flex flex-col gap-2 group"
+              className="h-auto py-4 flex flex-col gap-2 group hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all"
               onClick={() => navigate("/grafici")}
             >
               <TrendingUp className="h-6 w-6 text-primary group-hover:text-primary-foreground transition-colors" />
