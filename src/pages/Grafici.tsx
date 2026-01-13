@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -20,8 +19,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   Legend,
   Area,
   AreaChart,
@@ -35,7 +32,10 @@ import {
   Calendar,
   Loader2,
   AlertTriangle,
-  Filter,
+  Apple,
+  Leaf,
+  Activity,
+  Globe,
 } from "lucide-react";
 import { supabase } from "@/integrations/backend/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,6 +76,20 @@ interface LowStockItem {
   threshold: number;
 }
 
+interface ProductDetails {
+  id: string;
+  category: string;
+  nutriscore: string;
+  ecoscore: string;
+  nova_group: number;
+  origin: string;
+}
+
+const SCORE_COLORS: Record<string, string> = {
+  a: "#1e8f4e", b: "#85bb2f", c: "#ffcc00", d: "#ef8200", e: "#e63e11",
+  "1": "#1e8f4e", "2": "#85bb2f", "3": "#ffcc00", "4": "#e63e11"
+};
+
 const generateColor = (index: number, total: number) => {
   const hue = (index * (360 / Math.max(total, 1))) % 360;
   return `hsl(${hue}, 70%, 55%)`;
@@ -90,8 +104,7 @@ const Grafici = () => {
   const [dispenseStock, setDispenseStock] = useState<DispenseStock[]>([]);
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
   const [dateRange, setDateRange] = useState("7");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [dispensaFilter, setDispensaFilter] = useState("all");
+  const [products, setProducts] = useState<ProductDetails[]>([]);
   const [allCategories, setAllCategories] = useState<string[]>([]);
   const [allDispense, setAllDispense] = useState<{ id: string; name: string }[]>([]);
 
@@ -119,8 +132,9 @@ const Grafici = () => {
       // Fetch products with categories for this group
       const { data: productsData } = await supabase
         .from("products")
-        .select("id, category")
+        .select("id, category, nutriscore, ecoscore, nova_group, origin")
         .eq("group_id", activeGroup.id);
+      setProducts(productsData || []);
 
       // Fetch product categories
       const { data: productCategoriesData } = await supabase
@@ -249,6 +263,46 @@ const Grafici = () => {
     return { totalAdditions, totalRemovals, totalStock };
   }, [scanLogs, dispenseStock]);
 
+   // --- LOGICA DEI DATI ---
+  const nutriData = useMemo(() => {
+    const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+    products.forEach(p => {
+      const score = p.nutriscore?.toUpperCase();
+      if (score && counts[score] !== undefined) counts[score]++;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [products]);
+
+  const ecoData = useMemo(() => {
+    const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+    products.forEach(p => {
+      const score = p.ecoscore?.toUpperCase();
+      if (score && counts[score] !== undefined) counts[score]++;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [products]);
+
+  const novaData = useMemo(() => {
+    const counts: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0 };
+    products.forEach(p => {
+      const score = String(p.nova_group);
+      if (counts[score] !== undefined) counts[score]++;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [products]);
+
+  const originData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    products.forEach(p => {
+      const origin = p.origin || "Sconosciuta";
+      counts[origin] = (counts[origin] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [products]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -324,6 +378,74 @@ const Grafici = () => {
                 <p className="text-sm text-muted-foreground">Stock Totale</p>
                 <p className="text-2xl font-bold">{stats.totalStock}</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+            {/* Row 1: Health & Sustainability */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Nutri-Score Chart */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Apple className="h-4 w-4 text-green-500"/> Nutri-Score</CardTitle></CardHeader>
+          <CardContent className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={nutriData}>
+                <XAxis dataKey="name" hide />
+                <Tooltip cursor={{fill: 'transparent'}} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                  {nutriData.map((entry) => (
+                    <Cell key={entry.name} fill={SCORE_COLORS[entry.name.toLowerCase()] || "#ccc"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Eco-Score Chart */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Leaf className="h-4 w-4 text-emerald-500"/> Eco-Score</CardTitle></CardHeader>
+          <CardContent className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={ecoData} innerRadius={30} outerRadius={50} dataKey="value">
+                  {ecoData.map((entry) => (
+                    <Cell key={entry.name} fill={SCORE_COLORS[entry.name.toLowerCase()] || "#ccc"} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* NOVA Group */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Activity className="h-4 w-4 text-blue-500"/> Processazione NOVA</CardTitle></CardHeader>
+          <CardContent className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={novaData} layout="vertical">
+                <YAxis dataKey="name" type="category" width={20} tick={{fontSize: 10}} />
+                <XAxis type="number" hide />
+                <Tooltip />
+                <Bar dataKey="value" fill="#6366f1" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Origins */}
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Globe className="h-4 w-4 text-orange-500"/> Top Origini</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {originData.map((item, i) => (
+                <div key={i} className="flex justify-between text-xs border-b pb-1">
+                  <span>{item.name}</span>
+                  <span className="font-bold">{item.value}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
