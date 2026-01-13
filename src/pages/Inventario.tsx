@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+// pages/Inventario.tsx
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,43 +26,14 @@ import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Search, Filter, Plus, Package, Loader2, Eye, Trash2, Columns, Warehouse, CalendarIcon, Minus, Clock, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/backend/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveGroup } from "@/contexts/ActiveGroupContext";
-import { toast } from "sonner";
 import { useNotificationContext } from "@/contexts/NotificationContext";
-import { useProductInfo } from "@/hooks/useProductInfo";
-import { format, differenceInDays, isBefore, addDays } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-
-interface Product {
-  id: string;
-  name: string | null;
-  barcode: string | null;
-  category: string | null;
-  created_at: string;
-  image_url?: string | null;
-  brand?: string | null;
-  origin?: string | null;
-  nutriscore?: string | null;
-  ecoscore?: string | null;
-  nova_group?: number | null;
-}
-
-interface ProductWithDetails extends Product {
-  totalQuantity: number;
-  dispensaNames: string[];
-  dispensaProducts: { id: string; dispensa_id: string; quantity: number; expiry_date: string | null }[];
-  allCategories: string[];
-  nearestExpiry: string | null;
-  displayQuantity: number; // 1 if not in any pantry, otherwise totalQuantity
-}
-
-interface Dispensa {
-  id: string;
-  name: string;
-}
+import { useInventoryData } from "@/hooks/useInventoryData";
+import { useProductActions } from "@/hooks/useProductActions.ts";
 
 type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "origin" | "nutriscore" | "ecoscore" | "nova" | "actions";
 
@@ -88,17 +60,14 @@ const Inventario = () => {
   const { user } = useAuth();
   const { activeGroup } = useActiveGroup();
   const { addLocalNotification } = useNotificationContext();
-  const { fetchProductInfo } = useProductInfo();
-  const [products, setProducts] = useState<ProductWithDetails[]>([]);
-  const [dispense, setDispense] = useState<Dispensa[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  const { products, setProducts, dispense, categories, brands, isLoading, refetch } = useInventoryData(user?.id, activeGroup?.id);
+  const { addProduct, deleteProduct, deleteProducts, updateQuantity, isSubmitting } = useProductActions(user?.id, activeGroup?.id, refetch, addLocalNotification);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
-  const [categories, setCategories] = useState<string[]>([]);
-  const [brands, setBrands] = useState<string[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(["select", "image", "name", "brand", "category", "dispensa", "quantity", "expiry", "actions"]);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
@@ -108,261 +77,32 @@ const Inventario = () => {
     name: "", barcode: "", category: "", quantity: 1, dispensa_id: "",
   });
 
-  useEffect(() => {
-    if (user && activeGroup) {
-      fetchData();
-    }
-  }, [user, activeGroup]);
-
-  const fetchData = async () => {
-    if (!activeGroup) return;
-    
-    try {
-      // Fetch products for the active group
-      const { data: productsData, error: productsError } = await supabase
-        .from("products")
-        .select("*")
-        .eq("group_id", activeGroup.id)
-        .order("created_at", { ascending: false });
-
-      if (productsError) throw productsError;
-
-      // Also fetch products without group_id but owned by user (legacy)
-      const { data: legacyProducts } = await supabase
-        .from("products")
-        .select("*")
-        .eq("user_id", user?.id)
-        .is("group_id", null)
-        .order("created_at", { ascending: false });
-
-      const allProducts = [...(productsData || []), ...(legacyProducts || [])];
-
-      const { data: dispenseData } = await supabase
-        .from("dispense")
-        .select("id, name")
-        .eq("group_id", activeGroup.id);
-      
-      const { data: dispenseProductsData } = await supabase
-        .from("dispense_products")
-        .select("id, product_id, quantity, dispensa_id, expiry_date, dispense:dispensa_id(name)");
-
-      const { data: allCategoriesData } = await supabase
-        .from("product_categories")
-        .select("product_id, category_name");
-
-      // Build maps
-      const productDispenseMap: Record<string, { 
-        total: number; 
-        names: string[]; 
-        products: { id: string; dispensa_id: string; quantity: number; expiry_date: string | null }[];
-        nearestExpiry: string | null;
-      }> = {};
-      
-      (dispenseProductsData || []).forEach((dp: any) => {
-        if (!productDispenseMap[dp.product_id]) {
-          productDispenseMap[dp.product_id] = { total: 0, names: [], products: [], nearestExpiry: null };
-        }
-        productDispenseMap[dp.product_id].total += dp.quantity;
-        productDispenseMap[dp.product_id].products.push({
-          id: dp.id,
-          dispensa_id: dp.dispensa_id,
-          quantity: dp.quantity,
-          expiry_date: dp.expiry_date,
-        });
-        if (dp.dispense?.name && !productDispenseMap[dp.product_id].names.includes(dp.dispense.name)) {
-          productDispenseMap[dp.product_id].names.push(dp.dispense.name);
-        }
-        if (dp.expiry_date) {
-          const current = productDispenseMap[dp.product_id].nearestExpiry;
-          if (!current || isBefore(new Date(dp.expiry_date), new Date(current))) {
-            productDispenseMap[dp.product_id].nearestExpiry = dp.expiry_date;
-          }
-        }
-      });
-
-      const productCategoriesMap: Record<string, string[]> = {};
-      (allCategoriesData || []).forEach((cat: { product_id: string; category_name: string }) => {
-        if (!productCategoriesMap[cat.product_id]) productCategoriesMap[cat.product_id] = [];
-        productCategoriesMap[cat.product_id].push(cat.category_name);
-      });
-
-      const productsWithDetails: ProductWithDetails[] = allProducts.map((p) => {
-        const totalQty = productDispenseMap[p.id]?.total || 0;
-        const hasDispensa = (productDispenseMap[p.id]?.products?.length || 0) > 0;
-        return {
-          ...p,
-          totalQuantity: totalQty,
-          dispensaNames: productDispenseMap[p.id]?.names || [],
-          dispensaProducts: productDispenseMap[p.id]?.products || [],
-          allCategories: productCategoriesMap[p.id] || (p.category ? [p.category] : []),
-          nearestExpiry: productDispenseMap[p.id]?.nearestExpiry || null,
-          displayQuantity: hasDispensa ? totalQty : 1, // Show 1 if not in any pantry
-        };
-      });
-
-      setProducts(productsWithDetails);
-      setDispense(dispenseData || []);
-
-      const allCats = new Set<string>();
-      const allBrands = new Set<string>();
-      (allCategoriesData || []).forEach((cat: { category_name: string }) => allCats.add(cat.category_name));
-      allProducts.forEach((p) => { 
-        if (p.category) allCats.add(p.category);
-        if (p.brand) allBrands.add(p.brand);
-      });
-      setCategories(Array.from(allCats).sort());
-      setBrands(Array.from(allBrands).sort());
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      toast.error("Errore nel caricamento dei prodotti");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleAddProduct = async () => {
-    if (!user || !activeGroup || !newProduct.barcode.trim() || !/^\d+$/.test(newProduct.barcode.trim()) || newProduct.quantity < 1) {
-      toast.error("Compila correttamente tutti i campi obbligatori");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const productInfo = await fetchProductInfo(newProduct.barcode.trim());
-      const productName = newProduct.name.trim() || productInfo?.name || null;
-      const productCategory = newProduct.category.trim() || productInfo?.category || null;
-
-      const { data: insertedProduct, error } = await supabase
-        .from("products")
-        .insert({
-          user_id: user.id,
-          group_id: activeGroup.id,
-          name: productName,
-          barcode: newProduct.barcode.trim(),
-          category: productCategory,
-          image_url: productInfo?.imageUrl || null,
-          brand: productInfo?.brand || null,
-          ingredients: productInfo?.ingredients || null,
-          nutriscore: productInfo?.nutriscoreGrade || null,
-          ecoscore: productInfo?.ecoscoreGrade || null,
-          nova_group: productInfo?.novaGroup || null,
-          allergens: productInfo?.allergens || null,
-          nutritional_values: productInfo?.nutriments || null,
-          packaging: productInfo?.packaging || null,
-          labels: productInfo?.labels || null,
-          origin: productInfo?.origin || null,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const categoriesToInsert: string[] = [];
-      if (productInfo?.categories) categoriesToInsert.push(...productInfo.categories);
-      if (newProduct.category.trim() && !categoriesToInsert.includes(newProduct.category.trim())) {
-        categoriesToInsert.push(newProduct.category.trim());
-      }
-      if (categoriesToInsert.length > 0) {
-        await supabase.from("product_categories").insert(
-          categoriesToInsert.map((cat) => ({ product_id: insertedProduct.id, category_name: cat }))
-        );
-      }
-
-      const hasValidDispensa = newProduct.dispensa_id && newProduct.dispensa_id !== "none" && newProduct.dispensa_id.length > 10;
-      if (hasValidDispensa) {
-        await supabase.from("dispense_products").insert({
-          dispensa_id: newProduct.dispensa_id,
-          product_id: insertedProduct.id,
-          quantity: newProduct.quantity,
-          expiry_date: expiryDate ? format(expiryDate, "yyyy-MM-dd") : null,
-        });
-      }
-
-      toast.success("Prodotto aggiunto con successo");
-      addLocalNotification("Prodotto aggiunto", `${productName || "Prodotto"} aggiunto all'inventario`, "success");
+    const success = await addProduct(newProduct, expiryDate);
+    if (success) {
       setNewProduct({ name: "", barcode: "", category: "", quantity: 1, dispensa_id: "" });
       setExpiryDate(undefined);
       setIsAddDialogOpen(false);
-      fetchData();
-    } catch (error) {
-      console.error("Error adding product:", error);
-      toast.error("Errore nell'aggiunta del prodotto");
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   const handleDeleteProduct = async () => {
     if (!deleteProductId) return;
-    try {
-      await supabase.from("dispense_products").delete().eq("product_id", deleteProductId);
-      await supabase.from("product_categories").delete().eq("product_id", deleteProductId);
-      const { error } = await supabase.from("products").delete().eq("id", deleteProductId);
-      if (error) throw error;
-      toast.success("Prodotto eliminato");
-      addLocalNotification("Prodotto eliminato", "Prodotto rimosso dall'inventario", "info");
-      fetchData();
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      toast.error("Errore nell'eliminazione");
-    } finally {
-      setDeleteProductId(null);
-    }
+    await deleteProduct(deleteProductId);
+    setDeleteProductId(null);
   };
 
   const handleBulkDelete = async () => {
-    if (selectedProducts.size === 0) return;
-    try {
-      for (const productId of selectedProducts) {
-        await supabase.from("dispense_products").delete().eq("product_id", productId);
-        await supabase.from("product_categories").delete().eq("product_id", productId);
-        await supabase.from("products").delete().eq("id", productId);
-      }
-      toast.success(`${selectedProducts.size} prodotti eliminati`);
+    const success = await deleteProducts(selectedProducts);
+    if (success) {
       setSelectedProducts(new Set());
       setShowBulkDeleteDialog(false);
-      fetchData();
-    } catch (error) {
-      console.error("Error bulk deleting:", error);
-      toast.error("Errore nell'eliminazione");
     }
   };
 
-  const handleQuickQuantityChange = async (product: ProductWithDetails, delta: number, e: React.MouseEvent) => {
+  const handleQuickQuantityChange = (product: any, delta: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (product.dispensaProducts.length === 0) {
-      toast.error("Prodotto non assegnato a nessuna dispensa");
-      return;
-    }
-    
-    // Use first dispensa_product
-    const dp = product.dispensaProducts[0];
-    const newQty = Math.max(0, dp.quantity + delta);
-    
-    try {
-      await supabase
-        .from("dispense_products")
-        .update({ quantity: newQty })
-        .eq("id", dp.id);
-      
-      // Update local state
-      setProducts(prev => prev.map(p => {
-        if (p.id === product.id) {
-          const updatedDp = p.dispensaProducts.map(d => 
-            d.id === dp.id ? { ...d, quantity: newQty } : d
-          );
-          return {
-            ...p,
-            totalQuantity: updatedDp.reduce((sum, d) => sum + d.quantity, 0),
-            dispensaProducts: updatedDp,
-          };
-        }
-        return p;
-      }));
-    } catch (error) {
-      console.error("Error updating quantity:", error);
-      toast.error("Errore nell'aggiornamento");
-    }
+    updateQuantity(product, delta, setProducts);
   };
 
   const getExpiryBadge = (expiryDate: string | null) => {
@@ -444,7 +184,6 @@ const Inventario = () => {
 
   return (
     <div className="space-y-6">
-      {/* Bulk Delete Dialog */}
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -458,7 +197,6 @@ const Inventario = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Single Delete Dialog */}
       <AlertDialog open={!!deleteProductId} onOpenChange={() => setDeleteProductId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -472,7 +210,6 @@ const Inventario = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Inventario</h1>
@@ -541,7 +278,6 @@ const Inventario = () => {
         </div>
       </div>
 
-      {/* Products Card */}
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
