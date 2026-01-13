@@ -25,7 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Filter, Plus, Package, Loader2, Eye, Trash2, Columns, Warehouse, CalendarIcon, Minus, Clock, AlertTriangle } from "lucide-react";
+import { Search, Filter, Plus, Package, Loader2, Eye, Trash2, Columns, Warehouse, CalendarIcon, Minus, Clock, AlertTriangle, FileUp } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveGroup } from "@/contexts/ActiveGroupContext";
 import { useNotificationContext } from "@/contexts/NotificationContext";
@@ -34,6 +34,7 @@ import { it } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useInventoryData } from "@/hooks/useInventoryData";
 import { useProductActions } from "@/hooks/useProductActions.ts";
+import { useProductImport } from "@/hooks/useProductImport";
 
 type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "origin" | "nutriscore" | "ecoscore" | "nova" | "actions";
 
@@ -63,6 +64,7 @@ const Inventario = () => {
   
   const { products, setProducts, dispense, categories, brands, isLoading, refetch } = useInventoryData(user?.id, activeGroup?.id);
   const { addProduct, deleteProduct, deleteProducts, updateQuantity, isSubmitting } = useProductActions(user?.id, activeGroup?.id, refetch, addLocalNotification);
+  const { importProducts, isImporting } = useProductImport(user?.id, activeGroup?.id, refetch);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -97,6 +99,14 @@ const Inventario = () => {
     if (success) {
       setSelectedProducts(new Set());
       setShowBulkDeleteDialog(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await importProducts(file);
+      e.target.value = ""; // Reset input
     }
   };
 
@@ -275,6 +285,26 @@ const Inventario = () => {
               </div>
             </DialogContent>
           </Dialog>
+
+          <div className="relative">
+            <input
+              type="file"
+              id="file-import"
+              className="hidden"
+              accept=".csv,.json,.xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={isImporting}
+            />
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              disabled={isImporting}
+              title="Importa tramite file"
+              onClick={() => document.getElementById('file-import')?.click()}
+            >
+              {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </div>
 
