@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Package, Warehouse, BarChart3, Bell, ShoppingCart, Smartphone, ArrowRight, Check, Zap, Shield, RefreshCw, Cpu, ChevronRight, Play, Users, Star, Scan, Globe, Lock, Sparkles, ChevronDown, Home, Wifi } from 'lucide-react';
+import { Package, Warehouse, BarChart3, Bell, ShoppingCart, Smartphone, ArrowRight, Check, Zap, Shield, RefreshCw, Cpu, ChevronRight, Play, Users, Star, Scan, Globe, Lock, Sparkles, ChevronDown, Wifi, User, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState, useRef, useMemo } from 'react';
 const Landing = () => {
@@ -132,11 +132,11 @@ const Landing = () => {
           </div>
           <div className="flex items-center gap-3">
             {user ? <>
-                <Link to="/dashboard"><Button variant="ghost">Dashboard</Button></Link>
-                <Link to="/dashboard"><Button className="shadow-glow">Il mio account</Button></Link>
+                <Link to="/profilo"><Button variant="ghost"><User/>My account</Button></Link>
+                <Link to="/dashboard"><Button className="shadow-glow"><LayoutDashboard/>My Dashboard</Button></Link>
               </> : <>
-                <Link to="/auth"><Button variant="ghost">Accedi</Button></Link>
-                <Link to="/auth"><Button className="shadow-glow">Inizia Gratis</Button></Link>
+                <Link to="/auth"><Button variant="ghost">Registrati</Button></Link>
+                <Link to="/auth"><Button className="shadow-glow">Accedi</Button></Link>
               </>}
           </div>
         </div>
