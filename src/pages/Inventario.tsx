@@ -1,5 +1,4 @@
-// pages/Inventario.tsx
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuCheckboxItem,
@@ -25,7 +24,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Filter, Plus, Package, Loader2, Eye, Trash2, Columns, Warehouse, CalendarIcon, Minus, Clock, AlertTriangle, FileUp } from "lucide-react";
+import { 
+  Search, Filter, Plus, Package, Loader2, Eye, Trash2, Columns, 
+  Warehouse, CalendarIcon, Minus, Clock, AlertTriangle, FileUp, Download, Info 
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveGroup } from "@/contexts/ActiveGroupContext";
 import { useNotificationContext } from "@/contexts/NotificationContext";
@@ -35,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { useInventoryData } from "@/hooks/useInventoryData";
 import { useProductActions } from "@/hooks/useProductActions.ts";
 import { useProductImport } from "@/hooks/useProductImport";
+import * as XLSX from "xlsx";
 
 type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "origin" | "nutriscore" | "ecoscore" | "nova" | "actions";
 
@@ -61,6 +64,7 @@ const Inventario = () => {
   const { user } = useAuth();
   const { activeGroup } = useActiveGroup();
   const { addLocalNotification } = useNotificationContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { products, setProducts, dispense, categories, brands, isLoading, refetch } = useInventoryData(user?.id, activeGroup?.id);
   const { addProduct, deleteProduct, deleteProducts, updateQuantity, isSubmitting } = useProductActions(user?.id, activeGroup?.id, refetch, addLocalNotification);
@@ -70,6 +74,7 @@ const Inventario = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(["select", "image", "name", "brand", "category", "dispensa", "quantity", "expiry", "actions"]);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
@@ -78,6 +83,27 @@ const Inventario = () => {
   const [newProduct, setNewProduct] = useState({
     name: "", barcode: "", category: "", quantity: 1, dispensa_id: "",
   });
+
+  const handleDownloadTemplate = (formatType: 'csv' | 'json' | 'xlsx') => {
+    const templateData = [
+      { barcode: "8076800195057", name: "Pasta Barilla (facoltativo)", brand: "Barilla (facoltativo)", category: "Pasta (facoltativo)", nutriscore: "A (facoltativo)" },
+      { barcode: "8002270014901", name: "Passata Mutti (facoltativo)", brand: "Mutti (facoltativo)", category: "Conserve (facoltativo)", nutriscore: "A (facoltativo)" }
+    ];
+
+    if (formatType === 'json') {
+      const blob = new Blob([JSON.stringify(templateData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template_inventario.json';
+      a.click();
+    } else {
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Prodotti");
+      XLSX.writeFile(wb, `template_inventario.${formatType === 'xlsx' ? 'xlsx' : 'csv'}`);
+    }
+  };
 
   const handleAddProduct = async () => {
     const success = await addProduct(newProduct, expiryDate);
@@ -88,25 +114,14 @@ const Inventario = () => {
     }
   };
 
-  const handleDeleteProduct = async () => {
-    if (!deleteProductId) return;
-    await deleteProduct(deleteProductId);
-    setDeleteProductId(null);
-  };
-
-  const handleBulkDelete = async () => {
-    const success = await deleteProducts(selectedProducts);
-    if (success) {
-      setSelectedProducts(new Set());
-      setShowBulkDeleteDialog(false);
-    }
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      await importProducts(file);
-      e.target.value = ""; // Reset input
+      const success = await importProducts(file);
+      if (success) {
+        setIsImportDialogOpen(false);
+        e.target.value = "";
+      }
     }
   };
 
@@ -117,18 +132,11 @@ const Inventario = () => {
 
   const getExpiryBadge = (expiryDate: string | null) => {
     if (!expiryDate) return null;
-    
     const expiry = new Date(expiryDate);
     const today = new Date();
     const daysUntilExpiry = differenceInDays(expiry, today);
-    
-    if (daysUntilExpiry < 0) {
-      return <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Scaduto</Badge>;
-    } else if (daysUntilExpiry <= 3) {
-      return <Badge variant="warning" className="gap-1"><Clock className="h-3 w-3" />Scade tra {daysUntilExpiry}g</Badge>;
-    } else if (daysUntilExpiry <= 7) {
-      return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />{format(expiry, "dd MMM", { locale: it })}</Badge>;
-    }
+    if (daysUntilExpiry < 0) return <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Scaduto</Badge>;
+    if (daysUntilExpiry <= 3) return <Badge variant="warning" className="gap-1"><Clock className="h-3 w-3" />Scade tra {daysUntilExpiry}g</Badge>;
     return <Badge variant="outline" className="text-xs">{format(expiry, "dd MMM yyyy", { locale: it })}</Badge>;
   };
 
@@ -156,20 +164,12 @@ const Inventario = () => {
 
   const toggleProductSelection = (productId: string) => {
     const newSelection = new Set(selectedProducts);
-    if (newSelection.has(productId)) {
-      newSelection.delete(productId);
-    } else {
-      newSelection.add(productId);
-    }
+    newSelection.has(productId) ? newSelection.delete(productId) : newSelection.add(productId);
     setSelectedProducts(newSelection);
   };
 
   const toggleAllSelection = () => {
-    if (selectedProducts.size === filteredProducts.length) {
-      setSelectedProducts(new Set());
-    } else {
-      setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
-    }
+    selectedProducts.size === filteredProducts.length ? setSelectedProducts(new Set()) : setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
   };
 
   const filteredProducts = useMemo(() => {
@@ -188,21 +188,20 @@ const Inventario = () => {
 
   const isColumnVisible = (key: ColumnKey) => visibleColumns.includes(key);
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  }
+  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   return (
     <div className="space-y-6">
+      {/* Alert Dialogs for Deletion */}
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminare {selectedProducts.size} prodotti?</AlertDialogTitle>
-            <AlertDialogDescription>Questa azione è irreversibile. I prodotti verranno rimossi da tutte le dispense.</AlertDialogDescription>
+            <AlertDialogDescription>L'azione è irreversibile.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Elimina tutti</AlertDialogAction>
+            <AlertDialogAction onClick={() => { deleteProducts(selectedProducts); setSelectedProducts(new Set()); setShowBulkDeleteDialog(false); }} className="bg-destructive text-white">Elimina tutti</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -211,29 +210,29 @@ const Inventario = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminare questo prodotto?</AlertDialogTitle>
-            <AlertDialogDescription>Questa azione è irreversibile. Il prodotto verrà rimosso da tutte le dispense.</AlertDialogDescription>
+            <AlertDialogDescription>Verrà rimosso da tutte le dispense.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annulla</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProduct} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Elimina</AlertDialogAction>
+            <AlertDialogAction onClick={() => { deleteProduct(deleteProductId!); setDeleteProductId(null); }} className="bg-destructive text-white">Elimina</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Inventario</h1>
-          <p className="text-muted-foreground">Gestisci tutti i prodotti del gruppo</p>
+          <h1 className="text-3xl font-bold mb-2 text-foreground">Inventario</h1>
+          <p className="text-muted-foreground">Gestisci i prodotti del gruppo {activeGroup?.name}</p>
         </div>
         <div className="flex gap-2">
           {selectedProducts.size > 0 && (
             <Button variant="destructive" onClick={() => setShowBulkDeleteDialog(true)} className="gap-2">
-              <Trash2 className="h-4 w-4" />
-              Elimina ({selectedProducts.size})
+              <Trash2 className="h-4 w-4" /> ({selectedProducts.size})
             </Button>
           )}
+          
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" />Aggiungi Prodotto</Button></DialogTrigger>
+            <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" />Aggiungi</Button></DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle>Nuovo Prodotto</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-4">
@@ -257,28 +256,6 @@ const Inventario = () => {
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Data di scadenza</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !expiryDate && "text-muted-foreground")}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {expiryDate ? format(expiryDate, "PPP", { locale: it }) : "Seleziona data"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-popover" align="start">
-                      <Calendar mode="single" selected={expiryDate} onSelect={setExpiryDate} initialFocus disabled={(date) => date < new Date()} />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Categoria (opzionale)</Label>
-                  <Input id="category" placeholder="es. Pasta" value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome (opzionale)</Label>
-                  <Input id="name" placeholder="es. Pasta Barilla 500g" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
-                </div>
                 <Button onClick={handleAddProduct} disabled={isSubmitting} className="w-full">
                   {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aggiungi Prodotto"}
                 </Button>
@@ -286,25 +263,65 @@ const Inventario = () => {
             </DialogContent>
           </Dialog>
 
-          <div className="relative">
-            <input
-              type="file"
-              id="file-import"
-              className="hidden"
-              accept=".csv,.json,.xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={isImporting}
-            />
-            <Button 
-              variant="outline" 
-              className="gap-2" 
-              disabled={isImporting}
-              title="Importa tramite file"
-              onClick={() => document.getElementById('file-import')?.click()}
-            >
-              {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-            </Button>
-          </div>
+          {/* Import Wizard Dialog */}
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <FileUp className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><FileUp className="h-5 w-5" /> Importazione Guidata</DialogTitle>
+                <DialogDescription>Importa massivamente i tuoi prodotti tramite file CSV, Excel o JSON.</DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-6 py-4">
+                <div className="bg-muted/50 p-4 rounded-lg border flex gap-3">
+                  <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <div className="text-sm space-y-2">
+                    <p className="font-semibold">Struttura del file richiesta:</p>
+                    <p>I nomi in <code className="bg-muted px-1 rounded text-xs font-bold">grassetto</code> sono obbligatori.</p>
+                    <p>Gli altri dati se non forniti saranno autogenerati.</p>
+                    <p>Possibili intestazioni: <code className="bg-muted px-1 rounded text-xs font-bold">barcode</code>, <code className="bg-muted px-1 rounded text-xs">name</code>, <code className="bg-muted px-1 rounded text-xs">brand</code>, <code className="bg-muted px-1 rounded text-xs">category</code>, <code className="bg-muted px-1 rounded text-xs">nutriscore</code>.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>1. Scarica un template di esempio</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadTemplate('xlsx')}><Download className="h-3 w-3" /> Excel</Button>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadTemplate('csv')}><Download className="h-3 w-3" /> CSV</Button>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadTemplate('json')}><Download className="h-3 w-3" /> JSON</Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>2. Carica il file compilato</Label>
+                  <div 
+                    className="border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.json,.xlsx,.xls" onChange={handleFileChange} />
+                    {isImporting ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-sm animate-pulse">Elaborazione in corso...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                          <FileUp className="h-6 w-6 text-primary" />
+                        </div>
+                        <p className="font-medium">Clicca per selezionare un file</p>
+                        <p className="text-xs text-muted-foreground mt-1">Trascina qui o clicca per sfogliare</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -322,13 +339,6 @@ const Inventario = () => {
                 <SelectContent className="bg-popover">
                   <SelectItem value="all">Tutte</SelectItem>
                   {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={brandFilter} onValueChange={setBrandFilter}>
-                <SelectTrigger className="w-[120px]"><SelectValue placeholder="Marca" /></SelectTrigger>
-                <SelectContent className="bg-popover">
-                  <SelectItem value="all">Tutte</SelectItem>
-                  {brands.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                 </SelectContent>
               </Select>
               <DropdownMenu>
@@ -349,7 +359,6 @@ const Inventario = () => {
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-2">Nessun prodotto</h3>
-              <p className="mb-4">Inizia aggiungendo il tuo primo prodotto</p>
             </div>
           ) : (
             <div className="rounded-md border overflow-x-auto">
@@ -364,16 +373,9 @@ const Inventario = () => {
                     {isColumnVisible("image") && <TableHead className="w-16">Img</TableHead>}
                     {isColumnVisible("name") && <TableHead>Prodotto</TableHead>}
                     {isColumnVisible("brand") && <TableHead>Marca</TableHead>}
-                    {isColumnVisible("barcode") && <TableHead>Codice a barre</TableHead>}
-                    {isColumnVisible("category") && <TableHead>Categoria</TableHead>}
-                    {isColumnVisible("dispensa") && <TableHead>Dispensa</TableHead>}
                     {isColumnVisible("quantity") && <TableHead>Quantità</TableHead>}
                     {isColumnVisible("expiry") && <TableHead>Scadenza</TableHead>}
-                    {isColumnVisible("origin") && <TableHead>Origine</TableHead>}
-                    {isColumnVisible("nutriscore") && <TableHead>Nutri-Score</TableHead>}
-                    {isColumnVisible("ecoscore") && <TableHead>Eco-Score</TableHead>}
-                    {isColumnVisible("nova") && <TableHead>NOVA</TableHead>}
-                    {isColumnVisible("date") && <TableHead>Data creazione</TableHead>}
+                    {isColumnVisible("nutriscore") && <TableHead>Nutri</TableHead>}
                     {isColumnVisible("actions") && <TableHead className="text-right">Azioni</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -386,44 +388,23 @@ const Inventario = () => {
                         </TableCell>
                       )}
                       {isColumnVisible("image") && <TableCell>{product.image_url ? <img src={product.image_url} alt="" className="h-10 w-10 rounded object-contain bg-white border" /> : <div className="h-10 w-10 rounded bg-muted flex items-center justify-center"><Package className="h-4 w-4 text-muted-foreground" /></div>}</TableCell>}
-                      {isColumnVisible("name") && <TableCell className="font-medium">{product.name || <span className="text-muted-foreground italic">Senza nome</span>}</TableCell>}
+                      {isColumnVisible("name") && <TableCell className="font-medium max-w-[200px] truncate">{product.name || <span className="text-muted-foreground italic">Senza nome</span>}</TableCell>}
                       {isColumnVisible("brand") && <TableCell className="text-muted-foreground">{product.brand || "—"}</TableCell>}
-                      {isColumnVisible("barcode") && <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{product.barcode || "—"}</code></TableCell>}
-                      {isColumnVisible("category") && <TableCell>{product.allCategories.length > 0 ? (
-                        <div className="flex flex-wrap gap-1 max-w-xs">{product.allCategories.slice(0, 2).map((cat) => <Badge key={cat} variant="secondary" className="text-xs">{cat}</Badge>)}{product.allCategories.length > 2 && <Badge variant="outline" className="text-xs">+{product.allCategories.length - 2}</Badge>}</div>
-                      ) : "—"}</TableCell>}
-                      {isColumnVisible("dispensa") && <TableCell>{product.dispensaNames.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">{product.dispensaNames.map((name) => <Badge key={name} variant="outline" className="text-xs"><Warehouse className="h-3 w-3 mr-1" />{name}</Badge>)}</div>
-                      ) : <span className="text-muted-foreground">—</span>}</TableCell>}
                       {isColumnVisible("quantity") && (
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          {product.dispensaProducts.length > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, -1, e)} disabled={product.totalQuantity === 0}>
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <Badge variant={product.totalQuantity === 0 ? "outline" : "secondary"} className="min-w-[40px] justify-center">
-                                {product.totalQuantity}
-                              </Badge>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, 1, e)}>
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Badge variant="secondary" className="min-w-[40px] justify-center">1</Badge>
-                          )}
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, -1, e)} disabled={product.totalQuantity === 0}><Minus className="h-3 w-3" /></Button>
+                            <Badge variant={product.totalQuantity === 0 ? "outline" : "secondary"}>{product.totalQuantity}</Badge>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleQuickQuantityChange(product, 1, e)}><Plus className="h-3 w-3" /></Button>
+                          </div>
                         </TableCell>
                       )}
                       {isColumnVisible("expiry") && <TableCell>{getExpiryBadge(product.nearestExpiry)}</TableCell>}
-                      {isColumnVisible("origin") && <TableCell className="text-muted-foreground text-sm">{product.origin || "—"}</TableCell>}
                       {isColumnVisible("nutriscore") && <TableCell>{product.nutriscore ? <Badge className={cn("uppercase font-bold text-white", getNutriscoreBg(product.nutriscore))}>{product.nutriscore}</Badge> : "—"}</TableCell>}
-                      {isColumnVisible("ecoscore") && <TableCell>{product.ecoscore ? <Badge className={cn("uppercase font-bold text-white", getEcoscoreBg(product.ecoscore))}>{product.ecoscore}</Badge> : "—"}</TableCell>}
-                      {isColumnVisible("nova") && <TableCell>{product.nova_group ? <Badge variant="outline" className="font-bold">{product.nova_group}</Badge> : "—"}</TableCell>}
-                      {isColumnVisible("date") && <TableCell className="text-muted-foreground">{new Date(product.created_at).toLocaleDateString('it-IT')}</TableCell>}
                       {isColumnVisible("actions") && <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/prodotti/${product.id}`); }}><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive" onClick={(e) => { e.stopPropagation(); setDeleteProductId(product.id); }}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); setDeleteProductId(product.id); }}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </TableCell>}
                     </TableRow>
