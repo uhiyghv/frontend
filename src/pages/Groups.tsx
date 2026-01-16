@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useActiveGroup } from "@/contexts/ActiveGroupContext";
 import { toast } from "sonner";
 import { useNotificationContext } from "@/contexts/NotificationContext";
+
+// Validation schemas
+const groupNameSchema = z.string().trim().min(1, "Il nome è obbligatorio").max(100, "Il nome deve essere massimo 100 caratteri");
+const groupDescSchema = z.string().trim().max(500, "La descrizione deve essere massimo 500 caratteri").optional();
+const emailSchema = z.string().trim().email("Email non valida").max(255, "Email troppo lunga");
 
 interface Group {
   id: string;
@@ -126,14 +132,28 @@ const Groups = () => {
   };
 
   const handleCreateGroup = async () => {
-    if (!user || !newGroupName.trim()) return;
+    if (!user) return;
+    
+    // Validate inputs
+    const nameResult = groupNameSchema.safeParse(newGroupName);
+    if (!nameResult.success) {
+      toast.error(nameResult.error.errors[0]?.message || "Nome non valido");
+      return;
+    }
+    
+    const descResult = groupDescSchema.safeParse(newGroupDesc);
+    if (!descResult.success) {
+      toast.error(descResult.error.errors[0]?.message || "Descrizione non valida");
+      return;
+    }
+    
     setIsSaving(true);
     try {
       const { data, error } = await supabase
         .from("groups")
         .insert({
-          name: newGroupName.trim(),
-          description: newGroupDesc.trim() || null,
+          name: nameResult.data,
+          description: descResult.data || null,
           owner_id: user.id,
         })
         .select()
@@ -151,7 +171,7 @@ const Groups = () => {
       });
 
       toast.success("Gruppo creato con successo");
-      addLocalNotification("Gruppo", `${newGroupName} è stato creato`, "success");
+      addLocalNotification("Gruppo", `${nameResult.data} è stato creato`, "success");
       setNewGroupName("");
       setNewGroupDesc("");
       setIsCreateOpen(false);
@@ -165,7 +185,15 @@ const Groups = () => {
   };
 
   const handleInvite = async () => {
-    if (!user || !selectedGroup || !inviteEmail.trim()) return;
+    if (!user || !selectedGroup) return;
+    
+    // Validate email
+    const emailResult = emailSchema.safeParse(inviteEmail);
+    if (!emailResult.success) {
+      toast.error(emailResult.error.errors[0]?.message || "Email non valida");
+      return;
+    }
+    
     setIsSaving(true);
     
     try {
@@ -176,14 +204,14 @@ const Groups = () => {
         .eq("user_id", user.id)
         .maybeSingle();
       
-      const inviterName = profile?.username || user.email?.split("@")[0] || "Un utente";
+      const inviterName = profile?.username?.slice(0, 50) || user.email?.split("@")[0]?.slice(0, 50) || "Un utente";
 
       // Create the invite
       const { data: inviteData, error } = await supabase
         .from("group_invites")
         .insert({
           group_id: selectedGroup.id,
-          invited_email: inviteEmail.trim().toLowerCase(),
+          invited_email: emailResult.data.toLowerCase(),
           invited_by: user.id,
           invited_by_username: inviterName,
           role: inviteRole,
@@ -207,7 +235,7 @@ const Groups = () => {
             inviteId: inviteData.id,
             groupName: selectedGroup.name,
             inviterName,
-            inviteeEmail: inviteEmail.trim().toLowerCase(),
+            inviteeEmail: emailResult.data.toLowerCase(),
             role: inviteRole,
           },
         });
@@ -221,7 +249,7 @@ const Groups = () => {
       }
 
       toast.success("Invito inviato");
-      addLocalNotification("Invito", `Invito inviato a ${inviteEmail}`, "success");
+      addLocalNotification("Invito", `Invito inviato a ${emailResult.data}`, "success");
       setInviteEmail("");
       setIsInviteOpen(false);
       selectGroup(selectedGroup);
