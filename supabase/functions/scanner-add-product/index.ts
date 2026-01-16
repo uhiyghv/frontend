@@ -108,9 +108,22 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
-    // 2. Parse Body
+    // 2. Parse Body & Validate Inputs
     const { barcode, scanner_serial, action = 'add', quantity = 1 }: ScanRequest = await req.json()
-    // ... (validazioni esistenti)
+    
+    // Input validation
+    if (!barcode || !validateBarcode(barcode)) {
+      return jsonResponse({ error: 'Invalid barcode format. Must be 8-13 digits.' }, 400);
+    }
+    if (!scanner_serial || !validateSerialNumber(scanner_serial)) {
+      return jsonResponse({ error: 'Invalid scanner serial format. Must be SCN-XXXXXXXX-XXXX.' }, 400);
+    }
+    if (!validateQuantity(quantity)) {
+      return jsonResponse({ error: 'Invalid quantity. Must be an integer between 1 and 1000.' }, 400);
+    }
+    if (!['add', 'remove'].includes(action)) {
+      return jsonResponse({ error: 'Invalid action. Must be "add" or "remove".' }, 400);
+    }
 
     // 3. Scanner Check
     const { data: scanner, error: scannerError } = await supabase
