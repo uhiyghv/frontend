@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,9 @@ import { supabase } from "@/integrations/backend/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { useNotificationContext } from "@/contexts/NotificationContext";
+
+// Validation schema
+const usernameSchema = z.string().trim().max(50, "Il nome utente deve essere massimo 50 caratteri").optional();
 
 interface Profile {
   id: string;
@@ -80,12 +84,20 @@ const Profile = () => {
 
   const handleSave = async () => {
     if (!user) return;
+    
+    // Validate username
+    const usernameResult = usernameSchema.safeParse(username);
+    if (!usernameResult.success) {
+      toast.error(usernameResult.error.errors[0]?.message || "Nome utente non valido");
+      return;
+    }
+    
     setIsSaving(true);
     try {
       const { error } = await supabase
         .from("profiles")
         .update({
-          username,
+          username: usernameResult.data || null,
           preferences,
         })
         .eq("user_id", user.id);

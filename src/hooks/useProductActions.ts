@@ -1,10 +1,17 @@
 // hooks/useProductActions.ts
 import { useState } from "react";
+import { z } from "zod";
 import { supabase } from "@/integrations/backend/client";
 import { toast } from "sonner";
 import { useProductInfo } from "@/hooks/useProductInfo";
 import { format } from "date-fns";
 import type { ProductWithDetails } from "./useInventoryData";
+
+// Validation schemas
+const barcodeSchema = z.string().trim().regex(/^\d{8,13}$/, "Il codice a barre deve essere di 8-13 cifre");
+const productNameSchema = z.string().trim().max(200, "Il nome deve essere massimo 200 caratteri").optional();
+const categorySchema = z.string().trim().max(100, "La categoria deve essere massimo 100 caratteri").optional();
+const quantitySchema = z.number().int().min(1, "La quantità deve essere almeno 1").max(10000, "La quantità deve essere massimo 10000");
 
 interface NewProductData {
   name: string;
@@ -25,25 +32,49 @@ export function useProductActions(
 
   /**
    * Aggiunge un nuovo prodotto all'inventario
-   * - Valida i dati inseriti
+   * - Valida i dati inseriti con zod
    * - Recupera info da Open Food Facts tramite barcode
    * - Inserisce il prodotto nel database
    * - Aggiunge le categorie associate
    * - Se specificata, aggiunge il prodotto alla dispensa con quantità e scadenza
    */
   const addProduct = async (newProduct: NewProductData, expiryDate?: Date) => {
-    // Validazione
-    if (!userId || !groupId || !newProduct.barcode.trim() || !/^\d+$/.test(newProduct.barcode.trim()) || newProduct.quantity < 1) {
-      toast.error("Compila correttamente tutti i campi obbligatori");
+    if (!userId || !groupId) {
+      toast.error("Utente non autenticato");
+      return false;
+    }
+
+    // Validate inputs
+    const barcodeResult = barcodeSchema.safeParse(newProduct.barcode);
+    if (!barcodeResult.success) {
+      toast.error(barcodeResult.error.errors[0]?.message || "Codice a barre non valido");
+      return false;
+    }
+
+    const nameResult = productNameSchema.safeParse(newProduct.name);
+    if (!nameResult.success) {
+      toast.error(nameResult.error.errors[0]?.message || "Nome non valido");
+      return false;
+    }
+
+    const categoryResult = categorySchema.safeParse(newProduct.category);
+    if (!categoryResult.success) {
+      toast.error(categoryResult.error.errors[0]?.message || "Categoria non valida");
+      return false;
+    }
+
+    const quantityResult = quantitySchema.safeParse(newProduct.quantity);
+    if (!quantityResult.success) {
+      toast.error(quantityResult.error.errors[0]?.message || "Quantità non valida");
       return false;
     }
 
     setIsSubmitting(true);
     try {
       // Fetch info prodotto da Open Food Facts
-      const productInfo = await fetchProductInfo(newProduct.barcode.trim());
-      const productName = newProduct.name.trim() || productInfo?.name || null;
-      const productCategory = newProduct.category.trim() || productInfo?.category || null;
+      const productInfo = await fetchProductInfo(barcodeResult.data);
+      const productName = nameResult.data || productInfo?.name || null;
+      const productCategory = categoryResult.data || productInfo?.category || null;
 
       // Inserisci prodotto
       const { data: insertedProduct, error } = await supabase
@@ -52,30 +83,32 @@ export function useProductActions(
           user_id: userId,
           group_id: groupId,
           name: productName,
-          barcode: newProduct.barcode.trim(),
+          barcode: barcodeResult.data,
           category: productCategory,
           image_url: productInfo?.imageUrl || null,
-          brand: productInfo?.brand || null,
-          ingredients: productInfo?.ingredients || null,
-          nutriscore: productInfo?.nutriscoreGrade || null,
-          ecoscore: productInfo?.ecoscoreGrade || null,
+          brand: productInfo?.brand?.slice(0, 200) || null,
+          ingredients: productInfo?.ingredients?.slice(0, 5000) || null,
+          nutriscore: productInfo?.nutriscoreGrade?.slice(0, 1) || null,
+          ecoscore: productInfo?.ecoscoreGrade?.slice(0, 1) || null,
           nova_group: productInfo?.novaGroup || null,
-          allergens: productInfo?.allergens || null,
+          allergens: productInfo?.allergens?.slice(0, 500) || null,
           nutritional_values: productInfo?.nutriments || null,
-          packaging: productInfo?.packaging || null,
-          labels: productInfo?.labels || null,
-          origin: productInfo?.origin || null,
+          packaging: productInfo?.packaging?.slice(0, 500) || null,
+          labels: productInfo?.labels?.slice(0, 500) || null,
+          origin: productInfo?.origin?.slice(0, 200) || null,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Inserisci categorie
+      // Inserisci categorie (validate length)
       const categoriesToInsert: string[] = [];
-      if (productInfo?.categories) categoriesToInsert.push(...productInfo.categories);
-      if (newProduct.category.trim() && !categoriesToInsert.includes(newProduct.category.trim())) {
-        categoriesToInsert.push(newProduct.category.trim());
+      if (productInfo?.categories) {
+        categoriesToInsert.push(...productInfo.categories.slice(0, 10).map(c => c.slice(0, 100)));
+      }
+      if (categoryResult.data && !categoriesToInsert.includes(categoryResult.data)) {
+        categoriesToInsert.push(categoryResult.data);
       }
       if (categoriesToInsert.length > 0) {
         await supabase.from("product_categories").insert(
@@ -89,7 +122,7 @@ export function useProductActions(
         await supabase.from("dispense_products").insert({
           dispensa_id: newProduct.dispensa_id,
           product_id: insertedProduct.id,
-          quantity: newProduct.quantity,
+          quantity: quantityResult.data,
           expiry_date: expiryDate ? format(expiryDate, "yyyy-MM-dd") : null,
         });
       }
