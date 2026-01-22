@@ -86,8 +86,28 @@ const Inventario = () => {
 
   const handleDownloadTemplate = (formatType: 'csv' | 'json' | 'xlsx') => {
     const templateData = [
-      { barcode: "8076800195057", name: "Pasta Barilla (facoltativo)", brand: "Barilla (facoltativo)", category: "Pasta (facoltativo)", nutriscore: "A (facoltativo)" },
-      { barcode: "8002270014901", name: "Passata Mutti (facoltativo)", brand: "Mutti (facoltativo)", category: "Conserve (facoltativo)", nutriscore: "A (facoltativo)" }
+      { 
+        barcode: "8076800195057", 
+        name: "Pasta Barilla", 
+        brand: "Barilla", 
+        category: "Pasta", 
+        nutriscore: "A",
+        origin: "Italia",
+        quantity: 5,
+        expiry_date: format(new Date(2025, 11, 31), "yyyy-MM-dd"),
+        dispensa_name: dispense[0]?.name
+      },
+      { 
+        barcode: "8002270014901", 
+        name: "Passata Mutti", 
+        brand: "Mutti", 
+        category: "Conserve", 
+        nutriscore: "A",
+        origin: "Italia",
+        quantity: 10,
+        expiry_date: "",
+        dispensa_name: dispense[0]?.name
+      }
     ];
 
     if (formatType === 'json') {
@@ -268,53 +288,84 @@ const Inventario = () => {
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2">
                 <FileUp className="h-4 w-4" />
+                Importa
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-xl">
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><FileUp className="h-5 w-5" /> Importazione Guidata</DialogTitle>
-                <DialogDescription>Importa massivamente i tuoi prodotti tramite file CSV, Excel o JSON.</DialogDescription>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileUp className="h-5 w-5 text-primary" /> Importazione Avanzata
+                </DialogTitle>
+                <DialogDescription>
+                  Carica un file per aggiungere prodotti e assegnarli automaticamente alle tue dispense.
+                </DialogDescription>
               </DialogHeader>
               
               <div className="space-y-6 py-4">
-                <div className="bg-muted/50 p-4 rounded-lg border flex gap-3">
-                  <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <div className="text-sm space-y-2">
-                    <p className="font-semibold">Struttura del file richiesta:</p>
-                    <p>I nomi in <code className="bg-muted px-1 rounded text-xs font-bold">grassetto</code> sono obbligatori.</p>
-                    <p>Gli altri dati se non forniti saranno autogenerati.</p>
-                    <p>Possibili intestazioni: <code className="bg-muted px-1 rounded text-xs font-bold">barcode</code>, <code className="bg-muted px-1 rounded text-xs">name</code>, <code className="bg-muted px-1 rounded text-xs">brand</code>, <code className="bg-muted px-1 rounded text-xs">category</code>, <code className="bg-muted px-1 rounded text-xs">nutriscore</code>.</p>
+                <div className="bg-muted/50 p-4 rounded-lg border space-y-3">
+                  <div className="flex gap-3">
+                    <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                    <p className="text-sm font-semibold">Parametri supportati nel file:</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div className="flex gap-2">
+                      <code className="font-bold text-primary">barcode</code> 
+                      <span className="text-muted-foreground">(Obbligatorio)</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <code className="font-bold text-primary">dispensa_name</code> 
+                      <span className="text-muted-foreground">(Es: "{dispense[0]?.name || "Cucina"}")</span>
+                    </div>
+                    <div className="flex gap-2"><code>name</code></div>
+                    <div className="flex gap-2"><code>brand</code></div>
+                    <div className="flex gap-2"><code>category</code></div>
+                    <div className="flex gap-2"><code>quantity</code></div>
+                    <div className="flex gap-2"><code>expiry_date</code> <span className="text-muted-foreground">(YYYY-MM-DD)</span></div>
+                    <div className="flex gap-2"><code>origin</code></div>
+                    <div className="flex gap-2"><code>nutriscore</code></div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <Label>1. Scarica un template di esempio</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadTemplate('xlsx')}><Download className="h-3 w-3" /> Excel</Button>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadTemplate('csv')}><Download className="h-3 w-3" /> CSV</Button>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => handleDownloadTemplate('json')}><Download className="h-3 w-3" /> JSON</Button>
+                  <Label className="text-base">1. Scarica il template aggiornato</Label>
+                  <p className="text-xs text-muted-foreground">Usa questi file come base per non commettere errori di formattazione.</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Button variant="outline" onClick={() => handleDownloadTemplate('xlsx')} className="hover:bg-green-50 hover:text-green-700 hover:border-green-200">
+                      <Download className="h-4 w-4 mr-2" /> Excel
+                    </Button>
+                    <Button variant="outline" onClick={() => handleDownloadTemplate('csv')} className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200">
+                      <Download className="h-4 w-4 mr-2" /> CSV
+                    </Button>
+                    <Button variant="outline" onClick={() => handleDownloadTemplate('json')} className="hover:bg-orange-50 hover:text-orange-700 hover:border-orange-200">
+                      <Download className="h-4 w-4 mr-2" /> JSON
+                    </Button>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <Label>2. Carica il file compilato</Label>
+                  <Label className="text-base">2. Trascina o seleziona il file</Label>
                   <div 
-                    className="border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center hover:bg-muted/30 transition-colors cursor-pointer"
+                    className="border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center hover:bg-primary/5 hover:border-primary/50 transition-all cursor-pointer group"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.json,.xlsx,.xls" onChange={handleFileChange} />
                     {isImporting ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm animate-pulse">Elaborazione in corso...</p>
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                        <div className="text-center">
+                          <p className="font-semibold text-primary">Importazione in corso</p>
+                          <p className="text-xs text-muted-foreground">Creazione prodotti e collegamenti dispense...</p>
+                        </div>
                       </div>
                     ) : (
                       <>
-                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                          <FileUp className="h-6 w-6 text-primary" />
+                        <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                          <FileUp className="h-7 w-7 text-primary" />
                         </div>
-                        <p className="font-medium">Clicca per selezionare un file</p>
-                        <p className="text-xs text-muted-foreground mt-1">Trascina qui o clicca per sfogliare</p>
+                        <p className="font-bold text-lg">Pronto al caricamento</p>
+                        <p className="text-sm text-muted-foreground text-center max-w-[250px] mt-1">
+                          Se il nome della dispensa non esiste, il prodotto verrà aggiunto all'inventario generale.
+                        </p>
                       </>
                     )}
                   </div>
