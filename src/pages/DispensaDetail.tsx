@@ -27,6 +27,9 @@ import {
   QrCode,
   Save,
   X,
+  LayoutGrid,
+  List,
+  MapPin,
 } from "lucide-react";
 import {
   Dialog,
@@ -61,6 +64,9 @@ interface ProductInDispensa {
   id: string;
   product_id: string;
   product_name: string | null;
+  product_image: string | null;
+  product_brand: string | null;
+  product_origin: string | null;
   quantity: number;
   threshold: number;
   last_scanned_at: string | null;
@@ -94,6 +100,7 @@ const DispensaDetail = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedScanner, setSelectedScanner] = useState<Scanner | null>(null);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+  const [productsView, setProductsView] = useState<"cards" | "table">("cards");
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -145,7 +152,7 @@ const DispensaDetail = () => {
           quantity,
           threshold,
           last_scanned_at,
-          products:product_id (name)
+          products:product_id (name, image_url, brand, origin)
         `)
         .eq("dispensa_id", id);
 
@@ -155,6 +162,9 @@ const DispensaDetail = () => {
             id: p.id,
             product_id: p.product_id,
             product_name: p.products?.name || null,
+            product_image: p.products?.image_url || null,
+            product_brand: p.products?.brand || null,
+            product_origin: p.products?.origin || null,
             quantity: p.quantity,
             threshold: p.threshold,
             last_scanned_at: p.last_scanned_at,
