@@ -49,24 +49,43 @@ export function TutorialOverlay() {
 
   const getCardPosition = () => {
     if (isCentered) return {};
-    
+
     const padding = 16;
-    const cardWidth = 400;
-    
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 768;
+    const cardWidth = Math.min(400, vw - padding * 2);
+    const estimatedCardHeight = 320;
+
+    const clampX = (x: number) =>
+      Math.max(padding, Math.min(x, vw - cardWidth - padding));
+    const clampY = (y: number) =>
+      Math.max(padding, Math.min(y, vh - estimatedCardHeight - padding));
+
+    let left: number;
+    let top: number;
+
     switch (currentStepData.position) {
-      case "right":
-        return {
-          left: `${targetRect!.right + padding}px`,
-          top: `${targetRect!.top}px`,
-        };
+      case "right": {
+        const fitsRight = targetRect!.right + padding + cardWidth <= vw;
+        left = fitsRight
+          ? targetRect!.right + padding
+          : Math.max(padding, targetRect!.left - cardWidth - padding);
+        top = targetRect!.top;
+        break;
+      }
       case "bottom":
-        return {
-          left: `${Math.max(padding, targetRect!.left - cardWidth / 2 + targetRect!.width / 2)}px`,
-          top: `${targetRect!.bottom + padding}px`,
-        };
-      default:
-        return {};
+      default: {
+        left = targetRect!.left - cardWidth / 2 + targetRect!.width / 2;
+        top = targetRect!.bottom + padding;
+        break;
+      }
     }
+
+    return {
+      left: `${clampX(left)}px`,
+      top: `${clampY(top)}px`,
+      width: `${cardWidth}px`,
+    };
   };
 
   return (
