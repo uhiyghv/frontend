@@ -112,22 +112,41 @@ Deno.serve(async (req) => {
     });
 
   try {
-    // 1. Auth & Client Setup
+    // 1. Auth: validate shared scanner API key (IoT device authentication)
+    // The scanner firmware must send: Authorization: Bearer <SCANNER_API_KEY>
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer "))
+    const scannerApiKey = Deno.env.get("SCANNER_API_KEY");
+
+    if (!scannerApiKey) {
+      console.error("SCANNER_API_KEY secret not configured");
+      return jsonResponse({ error: "Service not configured" }, 503);
+    }
+
+    if (!authHeader?.startsWith("Bearer ")) {
       return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    const providedToken = authHeader.replace("Bearer ", "").trim();
+
+    // Constant-time comparison to prevent timing attacks
+    const a = new TextEncoder().encode(providedToken);
+    const b = new TextEncoder().encode(scannerApiKey);
+    let valid = a.length === b.length;
+    const len = Math.max(a.length, b.length);
+    let diff = a.length ^ b.length;
+    for (let i = 0; i < len; i++) {
+      diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+    }
+    if (diff !== 0) valid = false;
+
+    if (!valid) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-
-    /*     const token = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-    if (authError || !user) return jsonResponse({ error: "Unauthorized" }, 401); */
 
     // 2. Parse Body & Validate Inputs
     const {
