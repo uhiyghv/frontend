@@ -51,17 +51,19 @@ export function AppHeader() {
   };
 
   return (
-    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6 gap-4">
-      <div className="flex items-center gap-4">
+    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-3 sm:px-6 gap-2 sm:gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
         <SidebarTrigger />
-        <GroupSwitcher />
+        <div className="min-w-0 flex-1 sm:flex-initial">
+          <GroupSwitcher />
+        </div>
         <div className="relative w-64 max-w-md hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Cerca prodotti, dispense..." className="pl-10" />
         </div>
       </div>
       
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative" data-notification-bell>
