@@ -651,7 +651,7 @@ const ProductDetail = () => {
     : "??";
 
   return (
-    <div className="space-y-6 container mx-auto pb-10">
+    <div className="space-y-6 container mx-auto pb-10 px-3 sm:px-6 max-w-full overflow-x-hidden">
       {/* --- DIALOGS --- */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
@@ -723,35 +723,37 @@ const ProductDetail = () => {
       </AlertDialog>
 
       {/* --- HEADER --- */}
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 border-b pb-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">
-              {product.name || "Prodotto Senza Nome"}
-            </h1>
-            {/* Bandiera reale o fallback */}
-            {flagUrl ? (
-              <img
-                src={flagUrl}
-                alt={product.origin || "Origin flag"}
-                className="h-6 w-auto shadow-sm rounded-sm object-cover aspect-[3/2]"
-                title={product.origin || ""}
-              />
-            ) : product.origin ? (
-              <Globe
-                className="h-6 w-6 text-muted-foreground"
-                xlinkTitle={product.origin || ""}
-              />
-            ) : null}
+      <div className="flex flex-col md:flex-row md:items-center gap-4 border-b pb-4">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight break-words">
+                {product.name || "Prodotto Senza Nome"}
+              </h1>
+              {/* Bandiera reale o fallback */}
+              {flagUrl ? (
+                <img
+                  src={flagUrl}
+                  alt={product.origin || "Origin flag"}
+                  className="h-6 w-auto shadow-sm rounded-sm object-cover aspect-[3/2]"
+                  title={product.origin || ""}
+                />
+              ) : product.origin ? (
+                <Globe
+                  className="h-6 w-6 text-muted-foreground"
+                  xlinkTitle={product.origin || ""}
+                />
+              ) : null}
+            </div>
+            <code className="text-xs sm:text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded inline-block mt-1 break-all">
+              {product.barcode}
+            </code>
           </div>
-          <code className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded">
-            {product.barcode}
-          </code>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto shrink-0">
           {!isEditing ? (
             <>
               <Button
