@@ -26,7 +26,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Search, Filter, Plus, Package, Loader2, Eye, Trash2, Columns, 
-  Warehouse, CalendarIcon, Minus, Clock, AlertTriangle, FileUp, Download, Info 
+  Warehouse, CalendarIcon, Minus, Clock, AlertTriangle, FileUp, Download, Info,
+  LayoutGrid, List
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveGroup } from "@/contexts/ActiveGroupContext";
@@ -38,6 +39,7 @@ import { useInventoryData } from "@/hooks/useInventoryData";
 import { useProductActions } from "@/hooks/useProductActions.ts";
 import { useProductImport } from "@/hooks/useProductImport";
 import * as XLSX from "xlsx";
+import { ProductCardGrid } from "@/components/ProductCardGrid";
 
 type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "origin" | "nutriscore" | "ecoscore" | "nova" | "actions";
 
@@ -76,6 +78,7 @@ const Inventario = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(["select", "image", "name", "brand", "category", "dispensa", "quantity", "expiry", "actions"]);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
