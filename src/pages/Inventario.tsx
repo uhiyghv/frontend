@@ -383,8 +383,8 @@ const Inventario = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />Prodotti ({filteredProducts.length})</CardTitle>
-            <div className="flex gap-3 w-full sm:w-auto flex-wrap">
-              <div className="relative flex-1 sm:flex-initial sm:w-64">
+            <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+              <div className="relative flex-1 sm:flex-initial sm:w-64 min-w-[160px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Cerca prodotto..." className="pl-10" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
@@ -395,16 +395,40 @@ const Inventario = () => {
                   {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="outline" size="icon"><Columns className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-popover">
-                  {ALL_COLUMNS.map((col) => (
-                    <DropdownMenuCheckboxItem key={col.key} checked={isColumnVisible(col.key)} onCheckedChange={(checked) => {
-                      setVisibleColumns(checked ? [...visibleColumns, col.key] : visibleColumns.filter((c) => c !== col.key));
-                    }}>{col.label}</DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex rounded-md border">
+                <Button
+                  type="button"
+                  variant={viewMode === "cards" ? "default" : "ghost"}
+                  size="icon"
+                  className="rounded-r-none"
+                  onClick={() => setViewMode("cards")}
+                  title="Vista a schede"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "table" ? "default" : "ghost"}
+                  size="icon"
+                  className="rounded-l-none"
+                  onClick={() => setViewMode("table")}
+                  title="Vista a tabella"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+              {viewMode === "table" && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild><Button variant="outline" size="icon"><Columns className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-popover">
+                    {ALL_COLUMNS.map((col) => (
+                      <DropdownMenuCheckboxItem key={col.key} checked={isColumnVisible(col.key)} onCheckedChange={(checked) => {
+                        setVisibleColumns(checked ? [...visibleColumns, col.key] : visibleColumns.filter((c) => c !== col.key));
+                      }}>{col.label}</DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -414,6 +438,15 @@ const Inventario = () => {
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-2">Nessun prodotto</h3>
             </div>
+          ) : viewMode === "cards" ? (
+            <ProductCardGrid
+              products={filteredProducts}
+              onProductClick={(id) => navigate(`/prodotti/${id}`)}
+              onDelete={(id) => setDeleteProductId(id)}
+              selectable
+              selected={selectedProducts}
+              onToggleSelect={toggleProductSelection}
+            />
           ) : (
             <div className="rounded-md border overflow-x-auto">
               <Table>
