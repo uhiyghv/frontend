@@ -242,12 +242,12 @@ const Inventario = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2 text-foreground">Inventario</h1>
-          <p className="text-muted-foreground">Gestisci i prodotti del gruppo {activeGroup?.name}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2 text-foreground">Inventario</h1>
+          <p className="text-sm sm:text-base text-muted-foreground truncate">Gestisci i prodotti del gruppo {activeGroup?.name}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {selectedProducts.size > 0 && (
             <Button variant="destructive" onClick={() => setShowBulkDeleteDialog(true)} className="gap-2">
               <Trash2 className="h-4 w-4" /> ({selectedProducts.size})
