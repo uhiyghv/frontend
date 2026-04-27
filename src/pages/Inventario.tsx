@@ -26,7 +26,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   Search, Filter, Plus, Package, Loader2, Eye, Trash2, Columns, 
-  Warehouse, CalendarIcon, Minus, Clock, AlertTriangle, FileUp, Download, Info 
+  Warehouse, CalendarIcon, Minus, Clock, AlertTriangle, FileUp, Download, Info,
+  LayoutGrid, List
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveGroup } from "@/contexts/ActiveGroupContext";
@@ -38,6 +39,7 @@ import { useInventoryData } from "@/hooks/useInventoryData";
 import { useProductActions } from "@/hooks/useProductActions.ts";
 import { useProductImport } from "@/hooks/useProductImport";
 import * as XLSX from "xlsx";
+import { ProductCardGrid } from "@/components/ProductCardGrid";
 
 type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "origin" | "nutriscore" | "ecoscore" | "nova" | "actions";
 
@@ -76,6 +78,7 @@ const Inventario = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(["select", "image", "name", "brand", "category", "dispensa", "quantity", "expiry", "actions"]);
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
@@ -239,12 +242,12 @@ const Inventario = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2 text-foreground">Inventario</h1>
-          <p className="text-muted-foreground">Gestisci i prodotti del gruppo {activeGroup?.name}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2 text-foreground">Inventario</h1>
+          <p className="text-sm sm:text-base text-muted-foreground truncate">Gestisci i prodotti del gruppo {activeGroup?.name}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {selectedProducts.size > 0 && (
             <Button variant="destructive" onClick={() => setShowBulkDeleteDialog(true)} className="gap-2">
               <Trash2 className="h-4 w-4" /> ({selectedProducts.size})
@@ -380,8 +383,8 @@ const Inventario = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary" />Prodotti ({filteredProducts.length})</CardTitle>
-            <div className="flex gap-3 w-full sm:w-auto flex-wrap">
-              <div className="relative flex-1 sm:flex-initial sm:w-64">
+            <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+              <div className="relative flex-1 sm:flex-initial sm:w-64 min-w-[160px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Cerca prodotto..." className="pl-10" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
@@ -392,16 +395,40 @@ const Inventario = () => {
                   {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild><Button variant="outline" size="icon"><Columns className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-popover">
-                  {ALL_COLUMNS.map((col) => (
-                    <DropdownMenuCheckboxItem key={col.key} checked={isColumnVisible(col.key)} onCheckedChange={(checked) => {
-                      setVisibleColumns(checked ? [...visibleColumns, col.key] : visibleColumns.filter((c) => c !== col.key));
-                    }}>{col.label}</DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex rounded-md border">
+                <Button
+                  type="button"
+                  variant={viewMode === "cards" ? "default" : "ghost"}
+                  size="icon"
+                  className="rounded-r-none"
+                  onClick={() => setViewMode("cards")}
+                  title="Vista a schede"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "table" ? "default" : "ghost"}
+                  size="icon"
+                  className="rounded-l-none"
+                  onClick={() => setViewMode("table")}
+                  title="Vista a tabella"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+              {viewMode === "table" && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild><Button variant="outline" size="icon"><Columns className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-popover">
+                    {ALL_COLUMNS.map((col) => (
+                      <DropdownMenuCheckboxItem key={col.key} checked={isColumnVisible(col.key)} onCheckedChange={(checked) => {
+                        setVisibleColumns(checked ? [...visibleColumns, col.key] : visibleColumns.filter((c) => c !== col.key));
+                      }}>{col.label}</DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -411,6 +438,15 @@ const Inventario = () => {
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium mb-2">Nessun prodotto</h3>
             </div>
+          ) : viewMode === "cards" ? (
+            <ProductCardGrid
+              products={filteredProducts}
+              onProductClick={(id) => navigate(`/prodotti/${id}`)}
+              onDelete={(id) => setDeleteProductId(id)}
+              selectable
+              selected={selectedProducts}
+              onToggleSelect={toggleProductSelection}
+            />
           ) : (
             <div className="rounded-md border overflow-x-auto">
               <Table>

@@ -27,6 +27,9 @@ import {
   QrCode,
   Save,
   X,
+  LayoutGrid,
+  List,
+  MapPin,
 } from "lucide-react";
 import {
   Dialog,
@@ -61,6 +64,9 @@ interface ProductInDispensa {
   id: string;
   product_id: string;
   product_name: string | null;
+  product_image: string | null;
+  product_brand: string | null;
+  product_origin: string | null;
   quantity: number;
   threshold: number;
   last_scanned_at: string | null;
@@ -94,6 +100,7 @@ const DispensaDetail = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedScanner, setSelectedScanner] = useState<Scanner | null>(null);
   const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+  const [productsView, setProductsView] = useState<"cards" | "table">("cards");
   
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -145,7 +152,7 @@ const DispensaDetail = () => {
           quantity,
           threshold,
           last_scanned_at,
-          products:product_id (name)
+          products:product_id (name, image_url, brand, origin)
         `)
         .eq("dispensa_id", id);
 
@@ -155,6 +162,9 @@ const DispensaDetail = () => {
             id: p.id,
             product_id: p.product_id,
             product_name: p.products?.name || null,
+            product_image: p.products?.image_url || null,
+            product_brand: p.products?.brand || null,
+            product_origin: p.products?.origin || null,
             quantity: p.quantity,
             threshold: p.threshold,
             last_scanned_at: p.last_scanned_at,
@@ -477,19 +487,43 @@ const DispensaDetail = () => {
       {/* Products */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" />
               Prodotti in Dispensa
             </CardTitle>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Cerca prodotto..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div className="flex gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cerca prodotto..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex rounded-md border shrink-0">
+                <Button
+                  type="button"
+                  variant={productsView === "cards" ? "default" : "ghost"}
+                  size="icon"
+                  className="rounded-r-none"
+                  onClick={() => setProductsView("cards")}
+                  title="Vista a schede"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={productsView === "table" ? "default" : "ghost"}
+                  size="icon"
+                  className="rounded-l-none"
+                  onClick={() => setProductsView("table")}
+                  title="Vista a tabella"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -500,8 +534,54 @@ const DispensaDetail = () => {
               <p>Nessun prodotto in questa dispensa</p>
               <p className="text-sm">Usa uno scanner per aggiungere prodotti</p>
             </div>
+          ) : productsView === "cards" ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+              {filteredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="relative group overflow-hidden cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 rounded-lg border bg-card"
+                  onClick={() => navigate(`/prodotti/${product.product_id}`)}
+                >
+                  <Badge
+                    variant="secondary"
+                    className="absolute top-2 right-2 z-10 font-bold shadow"
+                  >
+                    x{product.quantity}
+                  </Badge>
+                  <div className="aspect-square bg-white flex items-center justify-center p-3 border-b">
+                    {product.product_image ? (
+                      <img
+                        src={product.product_image}
+                        alt={product.product_name || ""}
+                        className="max-h-full max-w-full object-contain"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Package className="h-10 w-10 text-muted-foreground/40" />
+                    )}
+                  </div>
+                  <div className="p-2.5 space-y-1">
+                    <p className="font-medium text-sm line-clamp-2 leading-tight min-h-[2.5rem]">
+                      {product.product_name || <span className="text-muted-foreground italic">Senza nome</span>}
+                    </p>
+                    <div className="flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                      <span className="truncate">{product.product_brand || "—"}</span>
+                      {product.product_origin && (
+                        <span className="flex items-center gap-0.5 shrink-0">
+                          <MapPin className="h-3 w-3" />
+                          <span className="truncate max-w-[60px]">{product.product_origin}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="pt-1">
+                      {getStatusBadge(product.quantity, product.threshold)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

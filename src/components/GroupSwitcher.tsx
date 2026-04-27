@@ -43,12 +43,12 @@ export const GroupSwitcher = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="gap-2 min-w-[160px] justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            <span className="max-w-[120px] truncate">{activeGroup.name}</span>
+        <Button variant="outline" className="gap-2 w-full sm:min-w-[160px] sm:w-auto justify-between max-w-full">
+          <div className="flex items-center gap-2 min-w-0">
+            <Users className="h-4 w-4 text-primary shrink-0" />
+            <span className="max-w-[100px] sm:max-w-[120px] truncate">{activeGroup.name}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             {pendingInvites.length > 0 && (
               <Badge variant="destructive" className="h-5 w-5 p-0 flex items-center justify-center text-xs">
                 {pendingInvites.length}
