@@ -190,7 +190,17 @@ Deno.serve(async (req) => {
       type: "scanner",
     });
 
-    return json({ success: true, productId, productName, newQuantity: newQty });
+    return json({
+      success: true,
+      productId,
+      productName,
+      productImage,
+      productBrand,
+      newQuantity: newQty,
+      dispensaName: dispensa.name,
+      action,
+      quantity,
+    });
   } catch (err) {
     console.error("mobile-scan-product error:", err);
     return json({ error: "Errore interno del server" }, 500);
