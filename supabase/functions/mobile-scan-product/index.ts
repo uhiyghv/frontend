@@ -12,7 +12,8 @@ interface ScanRequest {
   quantity?: number;
 }
 
-const validateBarcode = (b: string) => /^\d{8,13}$/.test(b);
+const validateBarcode = (b: string) => /^[A-Za-z0-9\-_.]{4,48}$/.test(b);
+const isNumericBarcode = (b: string) => /^\d{8,14}$/.test(b);
 const validateQuantity = (q: number) => Number.isInteger(q) && q >= 1 && q <= 1000;
 const cleanCategory = (cat: string) => cat.replace(/^[a-z]{2}:/, "").trim();
 
