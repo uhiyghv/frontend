@@ -113,20 +113,25 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await admin
       .from("products")
-      .select("id, name")
-      .eq("barcode", barcode)
+      .select("id, name, image_url, brand")
+      .eq("barcode", trimmed)
       .eq("user_id", ownerId)
       .maybeSingle();
+
+    let productImage: string | null = null;
+    let productBrand: string | null = null;
 
     if (existing) {
       productId = existing.id;
       productName = existing.name || "Prodotto senza nome";
+      productImage = existing.image_url ?? null;
+      productBrand = existing.brand ?? null;
     } else {
-      const off = await fetchOpenFoodFactsData(barcode);
+      const off = isNumericBarcode(trimmed) ? await fetchOpenFoodFactsData(trimmed) : null;
       const { data: created, error: pErr } = await admin
         .from("products")
         .insert({
-          barcode,
+          barcode: trimmed,
           user_id: ownerId,
           group_id: dispensa.group_id,
           name: off?.name || "Nuovo Prodotto",
@@ -143,11 +148,13 @@ Deno.serve(async (req) => {
           labels: off?.labels,
           origin: off?.origin,
         })
-        .select("id, name")
+        .select("id, name, image_url, brand")
         .single();
       if (pErr) throw pErr;
       productId = created.id;
       productName = created.name;
+      productImage = created.image_url ?? null;
+      productBrand = created.brand ?? null;
       if (off?.categories_list?.length) {
         await admin.from("product_categories").insert(
           off.categories_list.map((c: string) => ({ product_id: productId, category_name: c })),
