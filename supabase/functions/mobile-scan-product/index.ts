@@ -79,7 +79,8 @@ Deno.serve(async (req) => {
 
     const { barcode, dispensa_id, action = "add", quantity = 1 }: ScanRequest = await req.json();
 
-    if (!barcode || !validateBarcode(barcode)) return json({ error: "Codice a barre non valido (8-13 cifre)" }, 400);
+    const trimmed = (barcode ?? "").toString().trim();
+    if (!trimmed || !validateBarcode(trimmed)) return json({ error: "Codice non valido (4-48 caratteri)" }, 400);
     if (!dispensa_id || typeof dispensa_id !== "string") return json({ error: "Dispensa richiesta" }, 400);
     if (!validateQuantity(quantity)) return json({ error: "Quantità non valida (1-1000)" }, 400);
     if (!["add", "remove"].includes(action)) return json({ error: "Azione non valida" }, 400);
