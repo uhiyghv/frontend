@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { useNotificationContext } from "@/contexts/NotificationContext";
 import { useActiveGroup } from "@/contexts/ActiveGroupContext";
+import { ScannerFab } from "@/components/ScannerFab";
 
 interface Dispensa {
   id: string;
@@ -660,6 +661,7 @@ const DispensaDetail = () => {
           )}
         </DialogContent>
       </Dialog>
+      {id && <ScannerFab defaultDispensaId={id} onScanComplete={fetchDispensaData} />}
     </div>
   );
 };

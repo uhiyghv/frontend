@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, Search, X, Trash2, Check, AlertTriangle, Info, XCircle, Radio } from "lucide-react";
+import { Bell, Search, X, Trash2, Check, AlertTriangle, Info, XCircle, Radio, ScanLine } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNotificationContext } from "@/contexts/NotificationContext";
 import { GroupSwitcher } from "@/components/GroupSwitcher";
+import { MobileScanner } from "@/components/MobileScanner";
 import { cn } from "@/lib/utils";
 
 export function AppHeader() {
   const { notifications, unreadCount, markAllAsRead, deleteNotification, clearAll } = useNotificationContext();
   const [isOpen, setIsOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -64,6 +66,15 @@ export function AppHeader() {
       </div>
       
       <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          aria-label="Apri scanner"
+          onClick={() => setScannerOpen(true)}
+        >
+          <ScanLine className="h-5 w-5" />
+        </Button>
         <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative" data-notification-bell>
@@ -123,6 +134,7 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <MobileScanner open={scannerOpen} onOpenChange={setScannerOpen} />
     </header>
   );
 }

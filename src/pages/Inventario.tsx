@@ -40,6 +40,7 @@ import { useProductActions } from "@/hooks/useProductActions.ts";
 import { useProductImport } from "@/hooks/useProductImport";
 import * as XLSX from "xlsx";
 import { ProductCardGrid } from "@/components/ProductCardGrid";
+import { ScannerFab } from "@/components/ScannerFab";
 
 type ColumnKey = "select" | "image" | "name" | "brand" | "barcode" | "category" | "dispensa" | "quantity" | "expiry" | "date" | "origin" | "nutriscore" | "ecoscore" | "nova" | "actions";
 
@@ -502,6 +503,7 @@ const Inventario = () => {
           )}
         </CardContent>
       </Card>
+      <ScannerFab onScanComplete={refetch} />
     </div>
   );
 };
