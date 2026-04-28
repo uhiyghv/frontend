@@ -12,7 +12,8 @@ interface ScanRequest {
   quantity?: number;
 }
 
-const validateBarcode = (b: string) => /^\d{8,13}$/.test(b);
+const validateBarcode = (b: string) => /^[A-Za-z0-9\-_.]{4,48}$/.test(b);
+const isNumericBarcode = (b: string) => /^\d{8,14}$/.test(b);
 const validateQuantity = (q: number) => Number.isInteger(q) && q >= 1 && q <= 1000;
 const cleanCategory = (cat: string) => cat.replace(/^[a-z]{2}:/, "").trim();
 
@@ -78,7 +79,8 @@ Deno.serve(async (req) => {
 
     const { barcode, dispensa_id, action = "add", quantity = 1 }: ScanRequest = await req.json();
 
-    if (!barcode || !validateBarcode(barcode)) return json({ error: "Codice a barre non valido (8-13 cifre)" }, 400);
+    const trimmed = (barcode ?? "").toString().trim();
+    if (!trimmed || !validateBarcode(trimmed)) return json({ error: "Codice non valido (4-48 caratteri)" }, 400);
     if (!dispensa_id || typeof dispensa_id !== "string") return json({ error: "Dispensa richiesta" }, 400);
     if (!validateQuantity(quantity)) return json({ error: "Quantità non valida (1-1000)" }, 400);
     if (!["add", "remove"].includes(action)) return json({ error: "Azione non valida" }, 400);
@@ -111,20 +113,25 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await admin
       .from("products")
-      .select("id, name")
-      .eq("barcode", barcode)
+      .select("id, name, image_url, brand")
+      .eq("barcode", trimmed)
       .eq("user_id", ownerId)
       .maybeSingle();
+
+    let productImage: string | null = null;
+    let productBrand: string | null = null;
 
     if (existing) {
       productId = existing.id;
       productName = existing.name || "Prodotto senza nome";
+      productImage = existing.image_url ?? null;
+      productBrand = existing.brand ?? null;
     } else {
-      const off = await fetchOpenFoodFactsData(barcode);
+      const off = isNumericBarcode(trimmed) ? await fetchOpenFoodFactsData(trimmed) : null;
       const { data: created, error: pErr } = await admin
         .from("products")
         .insert({
-          barcode,
+          barcode: trimmed,
           user_id: ownerId,
           group_id: dispensa.group_id,
           name: off?.name || "Nuovo Prodotto",
@@ -141,11 +148,13 @@ Deno.serve(async (req) => {
           labels: off?.labels,
           origin: off?.origin,
         })
-        .select("id, name")
+        .select("id, name, image_url, brand")
         .single();
       if (pErr) throw pErr;
       productId = created.id;
       productName = created.name;
+      productImage = created.image_url ?? null;
+      productBrand = created.brand ?? null;
       if (off?.categories_list?.length) {
         await admin.from("product_categories").insert(
           off.categories_list.map((c: string) => ({ product_id: productId, category_name: c })),
@@ -181,7 +190,17 @@ Deno.serve(async (req) => {
       type: "scanner",
     });
 
-    return json({ success: true, productId, productName, newQuantity: newQty });
+    return json({
+      success: true,
+      productId,
+      productName,
+      productImage,
+      productBrand,
+      newQuantity: newQty,
+      dispensaName: dispensa.name,
+      action,
+      quantity,
+    });
   } catch (err) {
     console.error("mobile-scan-product error:", err);
     return json({ error: "Errore interno del server" }, 500);
